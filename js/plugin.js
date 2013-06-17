@@ -6,6 +6,8 @@
 
 	$.picsure = function (options, element) {
 		this.$element = $(element);
+		this.options = options;
+		this.num = Math.round(Math.random() * 1E20);
 		this.density = +(window.devicePixelRatio) || 1;
 		this.imageSetCss = (function () {
 			var a = document.createElement('div');
@@ -18,10 +20,13 @@
 		} ());
 
 		this.original = this.$element.attr('src');
+		this.setOptions();
 		this.set = this.parseParams();
-		this.passed = this.tester();
-		this.setPassed();
-		this.bind();
+		if (!this.options.picture) {
+			this.passed = this.tester();
+			this.setPassed();
+			this.bind();
+		}
 
 	};
 
@@ -37,6 +42,10 @@
 				self.passed = self.tester();
 				self.setPassed();
 			});
+		},
+
+		setOptions: function () {
+			this.options = $.extend(true, {}, this.settings, this.options);
 		},
 
 		setPassed: function () {
@@ -55,33 +64,37 @@
 		},
 
 		parseParams: function () {
-			var srcset = $.trim(this.$element.attr('srcset'));
-			if (!srcset.match(' ')) {
-				return srcset;
-			}
-			var members = srcset.split(',');
-			var set = [];
-			$.each(members, function (i) {
-				var value = '';
-				var conditions = [];
-				var params = $.trim(members[i]).split(' ');
-				$.each(params, function (j) {
-					if (j === 0) {
-						value = params[j];
-						return;
-					}
-					var lastChar = params[j][params[j].length - 1];
-					if (lastChar.match(/[whx]/)) {
-						conditions.push({
-							type: lastChar,
-							value: +(params[j].slice(0, params[j].length - 1)),
-							pass: value
-						});
-					}
+			if (!this.options.picture) {
+				var srcset = $.trim(this.$element.attr('srcset'));
+				if (!srcset.match(' ')) {
+					return srcset;
+				}
+				var members = srcset.split(',');
+				var set = [];
+				$.each(members, function (i) {
+					var value = '';
+					var conditions = [];
+					var params = $.trim(members[i]).split(' ');
+					$.each(params, function (j) {
+						if (j === 0) {
+							value = params[j];
+							return;
+						}
+						var lastChar = params[j][params[j].length - 1];
+						if (lastChar.match(/[whx]/)) {
+							conditions.push({
+								type: lastChar,
+								value: +(params[j].slice(0, params[j].length - 1)),
+								pass: value
+							});
+						}
+					});
+					set.push(conditions);
 				});
-				set.push(conditions);
-			});
-			return set;
+				return set;
+			} else {
+				this.$element.addClass('picsure_' + this.num);
+			}
 		},
 
 		tester: function () {
@@ -154,7 +167,7 @@
 	};
 
 	$(function () {
-		var imgs = $('img');
+		var imgs = $('img:not(picture img)');
 		var pix = $('picture');
 		imgs.picsure();
 		pix.picsure({
