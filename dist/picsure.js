@@ -18,13 +18,26 @@
 			}
 			return false;
 		} ());
+		this.oneEm = (function () {
+			var a = $('<div/>').css({
+				position: 'absolute',
+				bottom: -1000,
+				right: -1000,
+				border: 'none',
+				margin: 0,
+				padding: 0,
+				width: '1em'
+			}).appendTo($('body'));
+			var em = a.width();
+			a.remove();
+			return em;
+		} ());
 
 		this.original = this.$element.attr('src');
 		this.setOptions();
 		this.set = this.parseParams();
 		if (!this.options.picture) {
-			this.passed = this.tester();
-			this.setPassed();
+			this.setPassed(this.tester(this.set));
 			this.bind();
 		}
 
@@ -39,7 +52,11 @@
 		bind: function () {
 			var self = this;
 			$(window).on('resize', function () {
-				self.passed = self.tester();
+				self.passed = self.tester(self.set);
+				self.setPassed();
+			});
+			$(document).on('load', 'img', function () {
+				self.passed = self.tester(self.set);
 				self.setPassed();
 			});
 		},
@@ -48,68 +65,138 @@
 			this.options = $.extend(true, {}, this.settings, this.options);
 		},
 
-		setPassed: function () {
+		setPassed: function (passed) {
 			var self = this;
-			if (self.passed.length === 0) {
+			if (passed.length === 0) {
 				if (self.$element.attr('src') !== self.original) {
 					self.$element.attr('src', self.original);
 				}
 				return;
 			}
-			$.each(self.passed, function (i) {
-				if (self.$element.attr('src') !== self.passed[i]) {
-					self.$element.attr('src', self.passed[i]);
+			$.each(passed, function (i) {
+				if (self.$element.attr('src') !== passed[i]) {
+					self.$element.attr('src', passed[i]);
 				}
 			});
+		},
+
+		parseSrcset: function (str) {
+			var srcset = $.trim(str);
+			if (!srcset.match(' ')) {
+				return srcset;
+			}
+			var members = srcset.split(',');
+			var set = [];
+//			console.log(media);
+			$.each(members, function (i) {
+				var value = '';
+				var conditions = [];
+				var params = $.trim(members[i]).split(' ');
+				$.each(params, function (j) {
+					if (j === 0) {
+						value = params[j];
+						return;
+					}
+					var lastChar = params[j][params[j].length - 1];
+					if (lastChar.match(/[whx]/)) {
+						conditions.push({
+							type: lastChar,
+							value: +(params[j].slice(0, params[j].length - 1)),
+							pass: value
+						});
+					}
+				});
+				set.push(conditions);
+			});
+//			console.log(set);
+			return set;
 		},
 
 		parseParams: function () {
 			if (!this.options.picture) {
 				var srcset = $.trim(this.$element.attr('srcset'));
-				if (!srcset.match(' ')) {
-					return srcset;
-				}
-				var members = srcset.split(',');
-				var set = [];
-				$.each(members, function (i) {
-					var value = '';
-					var conditions = [];
-					var params = $.trim(members[i]).split(' ');
-					$.each(params, function (j) {
-						if (j === 0) {
-							value = params[j];
-							return;
-						}
-						var lastChar = params[j][params[j].length - 1];
-						if (lastChar.match(/[whx]/)) {
-							conditions.push({
-								type: lastChar,
-								value: +(params[j].slice(0, params[j].length - 1)),
-								pass: value
-							});
-						}
-					});
-					set.push(conditions);
-				});
-				return set;
+//				console.log(this.parseSrcset(srcset));
+				return this.parseSrcset(srcset);
 			} else {
 				this.$element.addClass('picsure_' + this.num);
+				var self = this;
+				var sources = this.$element.find('source');
+//				var styles = [];
+				$.each(sources, function (i) {
+					var $src = $(sources[i]);
+					var media = $src.attr('media');
+					var srcset = $src.attr('srcset');
+					var set = self.parseSrcset(srcset, media);
+					if (typeof media !== 'undefined' && media !== '') {
+						self.parseMedia(media, set);
+					}
+/*
+					var bgImg = self.imageSetCss ? 'image-set(' + srcset + ')' : '';
+					styles.push([
+						'@media all and ', media, '{',
+						'.picsure_', self.num, '{',
+						'background-image: ', bgImg, ';',
+						'}',
+						'}'
+					].join(''));
+*/
+				});
+/*
+				$('head:first()')
+					.append([
+						'<style>',
+						styles.join(''),
+						'</style>'
+					].join(''));
+*/
 			}
 		},
 
-		tester: function () {
+		parseMedia: function (media) {
+			var self = this;
+			var str = $.trim(media);
+			var rules = str.split('and');
+			$.each(rules, function (i) {
+				var rule = $.trim(rules[i]);
+				var key = $.trim(rule.split(':')[0]);
+				if (key.indexOf('(') !== -1) {
+					key = key.slice(key.indexOf('(') + 1);
+				}
+				var value = $.trim(rule.split(':')[1]);
+				if (value.indexOf(')') !== -1) {
+					value = value.slice(0, value.indexOf(')'));
+				}
+				var integer = value.match(/(\d.*?)(?!\d)/);
+				var unit = value.substring(
+					value.indexOf(integer[0]) + integer[0].length,
+					value.length
+				);
+				integer = +(value.substring(
+					value.indexOf(integer[0]),
+					integer[0].length
+				));
+				var minMax = key.split('-')[0] || 'max';
+				if (unit === 'em') {
+					integer = integer * self.oneEm;
+				}
+				console.log(minMax, integer);
+				//				var number = ;
+			});
+		},
+
+		tester: function (set) {
 			var self = this;
 			var passed = [];
-			$.each(self.set, function (i) {
+			$.each(set, function (i) {
 				var result = true;
-				$.each(self.set[i], function (j) {
-					var condition = self.set[i][j];
+				$.each(set[i], function (j) {
+					var condition = set[i][j];
 					if (!self.testCondition(condition)) {
 						result = false;
 					}
 				});
 				if (result) {
-					passed.push(self.set[i][0].pass);
+					passed.push(set[i][0].pass);
 				}
 			});
 			return passed;
