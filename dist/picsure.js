@@ -44,7 +44,8 @@
 	};
 
 	$.picsure.settings = {
-		picture: false
+		picture: false,
+		fluid: false
 	};
 
 	$.picsure.prototype = {
@@ -52,12 +53,10 @@
 		bind: function () {
 			var self = this;
 			$(window).on('resize', function () {
-				self.passed = self.tester(self.set);
-				self.setPassed();
+				self.setPassed(self.tester(self.set));
 			});
 			$(document).on('load', 'img', function () {
-				self.passed = self.tester(self.set);
-				self.setPassed();
+				self.setPassed(self.tester(self.set));
 			});
 		},
 
