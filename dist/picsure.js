@@ -36,11 +36,10 @@
 		this.original = this.$element.attr('src');
 		this.setOptions();
 		this.set = this.parseParams();
+		this.setPassed(this.tester(this.set));
 		if (!this.options.picture) {
-			this.setPassed(this.tester(this.set));
 			this.bind();
 		}
-
 	};
 
 	$.picsure.settings = {
@@ -64,6 +63,30 @@
 			this.options = $.extend(true, {}, this.settings, this.options);
 		},
 
+		pickBest: function (sets) {
+			var bestResult = sets[0].pass;
+			var best = {};
+			$.each(sets, function (i) {
+				var set = sets[i];
+				if (!best[set.type]) {
+					best[set.type] = set;
+				}
+				if (set.value < best[set.type].value) {
+					best[set.type] = set;
+					bestResult = set.pass;
+				}
+			});
+
+			if (best.w && best.h) {
+				if ($(window).width() > $(window).height()) {
+					bestResult = best.w.pass;
+				} else {
+					bestResult = best.h.pass;
+				}
+			}
+			return bestResult;
+		},
+
 		setPassed: function (passed) {
 			var self = this;
 			if (passed.length === 0) {
@@ -72,22 +95,28 @@
 				}
 				return;
 			}
-			$.each(passed, function (i) {
-				if (self.$element.attr('src') !== passed[i]) {
-					self.$element.attr('src', passed[i]);
-				}
-			});
+			var best = self.pickBest(passed);
+			if (self.$element.attr('src') !== best) {
+				self.$element.attr('src', best);
+			}
 		},
 
-		parseSrcset: function (str) {
+		parseSrcset: function (str, media) {
 			var srcset = $.trim(str);
-			if (!srcset.match(' ')) {
+			if (!srcset.match(' ') && !media) {
 				return srcset;
 			}
 			var members = srcset.split(',');
 			var set = [];
-//			console.log(media);
 			$.each(members, function (i) {
+				if (media) {
+					$.each(media, function (j) {
+						if (media[j].minMax === 'max') {
+							members[i] = members[i] + ' ' + media[j].value + media[j].type;
+						}
+					});
+					//console.log(media, members[i]);
+				}
 				var value = '';
 				var conditions = [];
 				var params = $.trim(members[i]).split(' ');
@@ -107,14 +136,12 @@
 				});
 				set.push(conditions);
 			});
-//			console.log(set);
 			return set;
 		},
 
 		parseParams: function () {
 			if (!this.options.picture) {
 				var srcset = $.trim(this.$element.attr('srcset'));
-//				console.log(this.parseSrcset(srcset));
 				return this.parseSrcset(srcset);
 			} else {
 				this.$element.addClass('picsure_' + this.num);
@@ -125,21 +152,12 @@
 					var $src = $(sources[i]);
 					var media = $src.attr('media');
 					var srcset = $src.attr('srcset');
-					var set = self.parseSrcset(srcset, media);
 					if (typeof media !== 'undefined' && media !== '') {
-						self.parseMedia(media, set);
+						media = self.parseMedia(media);
 					}
-/*
-					var bgImg = self.imageSetCss ? 'image-set(' + srcset + ')' : '';
-					styles.push([
-						'@media all and ', media, '{',
-						'.picsure_', self.num, '{',
-						'background-image: ', bgImg, ';',
-						'}',
-						'}'
-					].join(''));
-*/
+					console.log(media, self.parseSrcset(srcset, media));
 				});
+				//return self.parseSrcset(srcset, media);
 /*
 				$('head:first()')
 					.append([
@@ -155,6 +173,7 @@
 			var self = this;
 			var str = $.trim(media);
 			var rules = str.split('and');
+			var queries = [];
 			$.each(rules, function (i) {
 				var rule = $.trim(rules[i]);
 				var key = $.trim(rule.split(':')[0]);
@@ -178,14 +197,21 @@
 				if (unit === 'em') {
 					integer = integer * self.oneEm;
 				}
-				console.log(minMax, integer);
-				//				var number = ;
+				var type = key.split('-')[1] || 'width';
+				type = type === 'height' ? 'h' : 'w';
+				queries.push({
+					minMax: minMax,
+					value: integer,
+					type: type
+				});
 			});
+			return queries;
 		},
 
 		tester: function (set) {
 			var self = this;
 			var passed = [];
+			//console.log(set);
 			$.each(set, function (i) {
 				var result = true;
 				$.each(set[i], function (j) {
@@ -195,7 +221,7 @@
 					}
 				});
 				if (result) {
-					passed.push(set[i][0].pass);
+					passed.push(set[i][0]);
 				}
 			});
 			return passed;
@@ -254,11 +280,11 @@
 
 	$(function () {
 		var imgs = $('img:not(picture img)');
-		var pix = $('picture');
+		//var pix = $('picture');
 		imgs.picsure();
-		pix.picsure({
-			picture: true
-		});
+		//pix.picsure({
+		//	picture: true
+		//});
 	});
 
 }(jQuery));
