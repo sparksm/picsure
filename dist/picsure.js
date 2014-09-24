@@ -141,7 +141,7 @@
 
 		parseParams: function () {
 			if (!this.options.picture) {
-				var srcset = $.trim(this.$element.attr('srcset'));
+				var srcset = $.trim(this.$element.attr('data-srcset'));
 				return this.parseSrcset(srcset);
 			} else {
 				this.$element.addClass('picsure_' + this.num);
@@ -151,7 +151,7 @@
 				$.each(sources, function (i) {
 					var $src = $(sources[i]);
 					var media = $src.attr('media');
-					var srcset = $src.attr('srcset');
+					var srcset = $src.attr('data-srcset');
 					if (typeof media !== 'undefined' && media !== '') {
 						media = self.parseMedia(media);
 					}
